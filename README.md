@@ -3,8 +3,8 @@ Decodes &amp; Re-Encodes Lunar Sega Saturn Menu/Item Data
   
 Lunar Menu Editor (lunar_menu.exe) Usage
 ========================================     
-lunar_menu.exe decodemenu InputMenuFname [sss]      
-lunar_menu.exe encodemenu InputMenuFname InputCsvFname [sss]      
+lunar_menu.exe decodemenu InputMenuFname OutputFname [sss]      
+lunar_menu.exe encodemenu InputMenuFname InputCsvFname OutputFname [sss]      
    sss will interpret SSSC JP table as the SSS JP table.       
     
 Decoding requires the decompressed binary menu/item data as input (4th binary image embedded within System.dat).  Decoding will output a comma delimited file containing the UTF8 encoded data from the input file as well as important file offsets and control codes.  
