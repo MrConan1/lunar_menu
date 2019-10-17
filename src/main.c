@@ -41,8 +41,8 @@ unsigned int G_iFileSizeBytes = 0;
 void printUsage(){
     printf("Error in input arguments.\n");
     printf("Usage:\n=========\n");
-	printf("lunar_menu.exe decodemenu InputMenuFname [sss]\n");
-	printf("lunar_menu.exe encodemenu InputMenuFname InputCsvFname [sss]\n");
+	printf("lunar_menu.exe decodemenu InputMenuFname OutputFname [sss]\n");
+	printf("lunar_menu.exe encodemenu InputMenuFname InputCsvFname OutputFname [sss]\n");
 	printf("\tsss will interpret SSSC JP table as the SSS JP table.\n");
 	printf("\n\n");
     return;
@@ -69,7 +69,7 @@ int main(int argc, char** argv){
 		printUsage();
 		return -1;
 	}
-	minarg = 3;
+	minarg = 4;
 
     /* Parameter #1 - Verify decode or encode */
     if ((strcmp(argv[1], "decodemenu") == 0)){
@@ -79,7 +79,9 @@ int main(int argc, char** argv){
 		/* Copy input/output file name parameters to local variables */
 		memset(inFileName, 0, 300);
 		strncpy(inFileName, argv[2], 299);
+
 		memset(outFileName, 0, 300);
+		strncpy(outFileName, argv[3], 299);
 	}
     else if( (strcmp(argv[1],"encodemenu") == 0) ){
         mode = MODE_ENCODE_MENU;
@@ -89,12 +91,16 @@ int main(int argc, char** argv){
 		/* Copy input/output file name parameters to local variables */
 		memset(inFileName, 0, 300);
 		strncpy(inFileName, argv[2], 299);
-		memset(outFileName, 0, 300);
 
 		/* Parameter #3 */
 		/* Copy csv input file name parameter to local variable */
 		memset(csvFileName, 0, 300);
 		strncpy(csvFileName, argv[3], 299);
+
+		/* Parameter #4 */
+		/* Copy output file name parameter to local variable */
+		memset(outFileName, 0, 300);
+		strncpy(outFileName, argv[4], 299);
 	}
     else{
         printUsage();
@@ -119,14 +125,7 @@ int main(int argc, char** argv){
     /***********************************************/
     /* Finished Checking the Input File Parameters */
     /***********************************************/
-	setBaseName(inFileName);
-	strncpy(outFileName, getBaseName(), 200);
-	if (mode == MODE_DECODE_MENU){
-		strcat(outFileName, "_menu_out.csv");
-	}
-	else{
-		strcat(outFileName, "_menu_out.dat");
-	}
+
 
 
     /********************************************/
