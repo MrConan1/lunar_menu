@@ -66,12 +66,14 @@ static void freeMenuData();
 int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 {
 
-	int x, y, rval;
+	int x, y, rval, entryEndLocated, line;
 	unsigned int fsize, outputSizeBytes;
 	unsigned char* pBuffer = NULL;
 	char* pInput = NULL;
 	unsigned short* outBuffer = NULL;
 	unsigned char* pMenuData = NULL;
+	entryEndLocated = 0;
+	line = 1;
 
 	/* Init Menu Items */
 	memset(menuRecordArray, 0, sizeof(menuRecord)*MAX_MENU_ITEMS);
@@ -122,11 +124,21 @@ int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 
 	while (1){
 
+		line++;
+
 		/* Column 1 - Old Offset */
 		pInput = ( char*)strtok(NULL, MENU_DELIM);
 		if (pInput == NULL) {
 			printf("Reached End of CSV Input Data.\n");
 			break;
+		}
+		else if ((*pInput == '-') && (entryEndLocated)){
+			/* Ignore any further data for this entry */
+			/* Ignore rest of row */
+			pInput = (char*)strtok(NULL, MENU_DELIM);
+			pInput = (char*)strtok(NULL, MENU_DELIM);
+			pInput = (char*)strtok(NULL, MENU_DELIM);
+			continue;
 		}
 		else if (*pInput == '-'){
 			/* Continuation */
@@ -136,34 +148,14 @@ int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 			unsigned int offset;
 			sscanf((char*)pInput, "%X", &offset);
 			menuRecordArray[numMenuItems].oldOffset = ((unsigned short)offset & 0xFFFF)/2;
+			entryEndLocated = 0;
 		}
 
-		/* Columns 2 - Ctrl Code or Skip */
+		/* Columns 2 - Original Ctrl Code (Skip) */
 		pInput = (char*)strtok(NULL, MENU_DELIM2);
 		if (pInput == NULL) {
 			printf("Reached Unexpected End of CSV Input Data.\n");
 			break;
-		}
-		else if ((pInput[0] == '0') && (pInput[1] == 'x')){
-			unsigned int ctrlCode;
-			int index;
-			sscanf(pInput, "%X", &ctrlCode);
-			index = menuRecordArray[numMenuItems].numSubRecords;
-			menuRecordArray[numMenuItems].subRecords[index].ctrlCode = (unsigned short)ctrlCode & 0xFFFF;
-			swap16(&(menuRecordArray[numMenuItems].subRecords[index].ctrlCode));
-			menuRecordArray[numMenuItems].subRecords[index].convertedString = NULL;
-			menuRecordArray[numMenuItems].numSubRecords++;
-
-			/* Terminator Found */
-			if (ctrlCode == 0xFFFF){
-				numMenuItems++;
-			}
-
-			/* Control Code Found */
-			/* Ignore rest of row */
-			pInput = (char*)strtok(NULL, MENU_DELIM);
-			pInput = (char*)strtok(NULL, MENU_DELIM);
-			continue;
 		}
 
 		/* Skip Column 3 */
@@ -192,49 +184,71 @@ int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 				numCharacters++;
 				ptr += numBytesInUtf8Char(*ptr);
 			}
+			
+			/* Control Code Entry */
+			if ((pInput[0] == '0') && (pInput[1] == 'x')){
+				unsigned int ctrlCode;
+				int index;
+				sscanf(pInput, "%X", &ctrlCode);
+				index = menuRecordArray[numMenuItems].numSubRecords;
+				menuRecordArray[numMenuItems].subRecords[index].ctrlCode = (unsigned short)ctrlCode & 0xFFFF;
+				swap16(&(menuRecordArray[numMenuItems].subRecords[index].ctrlCode));
+				menuRecordArray[numMenuItems].subRecords[index].convertedString = NULL;
+				menuRecordArray[numMenuItems].numSubRecords++;
 
-			index = menuRecordArray[numMenuItems].numSubRecords;
-			menuRecordArray[numMenuItems].subRecords[index].convertedString = (unsigned short*)malloc(numCharacters * 2);
-			if (menuRecordArray[numMenuItems].subRecords[index].convertedString == NULL){
-				printf("Error creating converted string.\n");
-				free(pBuffer);
-				freeMenuData();
-				return -1;
-			}
-			pOut = (unsigned char*)menuRecordArray[numMenuItems].subRecords[index].convertedString;
-			memset(pOut, 0xFF, numCharacters * 2);
-
-			ptr = (unsigned char*)pInput;
-			z = 0;
-			while (*ptr != '\0'){
-				unsigned char tmpChar;
-				if (*ptr == ' '){
-					pOut[z++] = ' '; //Control Code replacement performed by draw routine
+				/* Terminator Found */
+				if (ctrlCode == 0xFFFF){
+					numMenuItems++;
+					entryEndLocated = 1;
 				}
-				else{
-					int rval;
-					rval = getUTF8code_Byte((char*)ptr, &tmpChar);
-					if (rval < 0){
-						int numBytes, i;
-						printf("WARNING: No table mapping for unicode character, inserting space!\n\tHex Data: 0x");
-						numBytes = numBytesInUtf8Char((unsigned char)*ptr);
-						for (i = 0; i < numBytes; i++){
-							printf("%X", ptr[i]);
-						}
-						printf("\n\n");
-						tmpChar = 0;
+
+			}	
+			
+			/* Text Entry */
+			else{
+				index = menuRecordArray[numMenuItems].numSubRecords;
+				menuRecordArray[numMenuItems].subRecords[index].convertedString = (unsigned short*)malloc(numCharacters * 2);
+				if (menuRecordArray[numMenuItems].subRecords[index].convertedString == NULL){
+					printf("Error creating converted string.\n");
+					free(pBuffer);
+					freeMenuData();
+					return -1;
+				}
+				pOut = (unsigned char*)menuRecordArray[numMenuItems].subRecords[index].convertedString;
+				memset(pOut, 0xFF, numCharacters * 2);
+
+				ptr = (unsigned char*)pInput;
+				z = 0;
+				while (*ptr != '\0'){
+					unsigned char tmpChar;
+					if (*ptr == ' '){
+						pOut[z++] = ' '; //Control Code replacement performed by draw routine
 					}
-					pOut[z++] = tmpChar;
-				}				
-				ptr += numBytesInUtf8Char(*ptr);
+					else{
+						int rval;
+						rval = getUTF8code_Byte((char*)ptr, &tmpChar);
+						if (rval < 0){
+							int numBytes, i;
+							printf("WARNING: No table mapping for unicode character, inserting space!\n\tLine: %d\n\tHex Data: 0x",line);
+							numBytes = numBytesInUtf8Char((unsigned char)*ptr);
+							for (i = 0; i < numBytes; i++){
+								printf("%X", ptr[i]);
+							}
+							printf("\n\n");
+							tmpChar = 0;
+						}
+						pOut[z++] = tmpChar;
+					}				
+					ptr += numBytesInUtf8Char(*ptr);
+				}
+				//Align End of Text
+	//			if ((numCharacters & 0x1) != 0){
+	//				pOut[z] = 0xFF;
+	//				numCharacters++;
+	//			}
+				menuRecordArray[numMenuItems].subRecords[index].lenConvertedStringBytes = numCharacters;
+				menuRecordArray[numMenuItems].numSubRecords++;
 			}
-			//Align End of Text
-//			if ((numCharacters & 0x1) != 0){
-//				pOut[z] = 0xFF;
-//				numCharacters++;
-//			}
-			menuRecordArray[numMenuItems].subRecords[index].lenConvertedStringBytes = numCharacters;
-			menuRecordArray[numMenuItems].numSubRecords++;
 		}
 	}
 	free(pBuffer);
