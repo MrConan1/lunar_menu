@@ -218,6 +218,8 @@ int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 				memset(pOut, 0xFF, numCharacters * 2);
 
 				ptr = (unsigned char*)pInput;
+				if (*ptr == '\"')  //Ignore leading quote
+					ptr++;
 				z = 0;
 				while (*ptr != '\0'){
 					unsigned char tmpChar;
@@ -241,6 +243,11 @@ int encodeMenu(FILE* infile, FILE* csvfile, FILE* outfile)
 					}				
 					ptr += numBytesInUtf8Char(*ptr);
 				}
+
+				//Ignore quote at end of entry
+				if (*(pOut-1) == '\"')
+					*(pOut - 1) = 0xFF;
+
 				//Align End of Text
 	//			if ((numCharacters & 0x1) != 0){
 	//				pOut[z] = 0xFF;
